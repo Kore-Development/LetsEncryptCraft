@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "letsencryptcraft",
+  "version": "${version}",
+  "name": "Let's Encrypt Craft",
+  "description": "Mojang uses old Java 8... so lets add it ourselves.",
+  "authors": [
+    "Cloudhunter"
+  ],
+  "contact": {
+    "sources": "https://github.com/Cloudhunter/LetsEncryptCraft/"
+  },
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "preLaunch": ["uk.co.cloudhunter.letsencryptcraft.LetsEncryptCraft"]
+  },
+  "depends": {
+    "fabricloader": ">=0.7.2"
+  }
+}

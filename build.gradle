@@ -1,75 +1,53 @@
-evaluationDependsOnChildren() // gotta make sure the children happen first
-
-apply plugin: 'java'
-apply plugin: 'eclipse'
-apply plugin: 'idea'
+plugins {
+    id 'java'
+}
 
 version = "1.2.0"
 
-allprojects {
-    group= "uk.co.cloudhunter.letsencryptcraft"
-    archivesBaseName = "letsencryptcraft"
+group = "uk.co.cloudhunter.letsencryptcraft"
+archivesBaseName = "letsencryptcraft-fabric"
 
+sourceCompatibility = targetCompatibility = "1.7"
+compileJava {
     sourceCompatibility = targetCompatibility = "1.7"
-    compileJava {
-        sourceCompatibility = targetCompatibility = "1.7"
-    }
 }
 
 repositories {
     jcenter()
-    maven { url = "http://files.minecraftforge.net/maven" }
-    mavenCentral()
+    maven { url = 'https://maven.fabricmc.net' }
 }
-
-task setupDecompWorkspace
-task setupDevWorkspace
-task setupCiWorkspace
 
 dependencies {
-    compileOnly group: 'commons-io', name: 'commons-io', version: '2.4'
+    implementation 'commons-io:commons-io:2.5'
+    implementation 'net.fabricmc:fabric-loader:0.7.+'
+    implementation 'org.apache.logging.log4j:log4j-api:2.8.1'
 }
 
-subprojects {
-    version = minecraft.version  + "-" + rootProject.version    
-    
-    dependencies {
-        compile rootProject
-    }
-    sourceSets.main.resources.srcDirs += rootProject.sourceSets.main.resources.srcDirs
-
-    jar {
-        duplicatesStrategy = 'exclude'
-        from rootProject.sourceSets.main.output
-    }
-
-    sourceJar {
-        duplicatesStrategy = 'exclude'
-        from rootProject.sourceSets.main.allSource
-    }
-    
-    artifacts {
-        archives sourceJar
-    }
-    
-    processResources {
-        inputs.property "version", project.version
-        inputs.property "mcversion", project.minecraft.version
-
-        from(sourceSets.main.resources.srcDirs) {
-            include 'mcmod.info'
-            expand 'version':project.version, 'mcversion':project.minecraft.version
-        }
-
-        from(sourceSets.main.resources.srcDirs) {
-            exclude 'mcmod.info'
-        }
-    }
-    
-    // task deps
-    rootProject.setupDecompWorkspace.dependsOn setupDecompWorkspace
-    rootProject.setupDevWorkspace.dependsOn setupDevWorkspace
-    rootProject.setupCiWorkspace.dependsOn setupCiWorkspace
-    rootProject.build.dependsOn build
-    rootProject.uploadArchives.dependsOn uploadArchives
+task sourceJar(type: Jar) {
+    archiveClassifier = 'src'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from sourceSets.main.allSource
 }
+
+jar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from rootProject.sourceSets.main.output
+}
+
+artifacts {
+    archives sourceJar
+}
+
+processResources {
+    inputs.property "version", project.version
+
+    from(sourceSets.main.resources.srcDirs) {
+        include 'fabric.mod.json'
+        expand 'version': project.version
+    }
+
+    from(sourceSets.main.resources.srcDirs) {
+        exclude 'fabric.mod.json'
+    }
+}
+
