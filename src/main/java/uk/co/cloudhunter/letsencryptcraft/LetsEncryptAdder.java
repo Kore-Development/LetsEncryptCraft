@@ -1,95 +1,73 @@
 package uk.co.cloudhunter.letsencryptcraft;
 
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManagerFactory;
-import java.io.BufferedInputStream;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.KeyStore;
-import java.security.cert.Certificate;
-import java.security.cert.CertificateFactory;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class LetsEncryptAdder {
-    public static void addLetsEncryptCertificate() throws Exception {
-        try (InputStream cert = LetsEncryptAdder.class.getResourceAsStream("/lets-encrypt-x3-cross-signed.der")) {
-            KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-            Path ksPath = Paths.get(System.getProperty("java.home"), "lib", "security", "cacerts");
-            keyStore.load(Files.newInputStream(ksPath), "changeit".toCharArray());
 
-            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+    private static final String UNKNOWN_ERROR_MSG = "" +
+            "An unknown error occurred whilst adding the Let's Encrypt root certificate." +
+            " I'm afraid you may not be able to access resources with a Let's Encrypt certificate D:";
 
-            InputStream caInput = new BufferedInputStream(cert);
-            Certificate crt = cf.generateCertificate(caInput);
+    private static final Logger logger = LogManager.getLogger("letsencrypt");
 
-            keyStore.setCertificateEntry("lets-encrypt-x3-cross-signed", crt);
+    private static boolean certificateLoaded;
 
-            TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-            tmf.init(keyStore);
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(null, tmf.getTrustManagers(), null);
-            SSLContext.setDefault(sslContext);
-        }
+    public static boolean isCertificateLoaded() {
+        return LetsEncryptAdder.certificateLoaded;
     }
 
-    public static void doStuff(final ILetsEncryptMod mod) {
-        String version = System.getProperty("java.version");
-        Pattern p = Pattern.compile("^(\\d+\\.\\d+).*?_(\\d+).*");
-        Matcher matcher = p.matcher(version);
-        String majorVersion;
-        int minorVersion;
-        if (matcher.matches()) {
-            majorVersion = matcher.group(1);
-            minorVersion = Integer.parseInt(matcher.group(2));
-        } else {
-            majorVersion = "1.7";
-            minorVersion = 110;
-            mod.info("Regex to parse Java version failed - applying anyway.");
-        }
+    private static void addLetsEncryptCertificates() throws Exception {
+        new CertChain()
+                .load("isrgrootx1")
+                .load("lets-encrypt-r3")
+                .done();
+    }
 
-        switch (majorVersion) {
-            case "1.7":
-                if (minorVersion >= 111) {
-                    mod.info("Not running as Java version is at least Java 7u111.");
-                    return;
-                }
-                break;
-            case "1.8":
-                if (minorVersion >= 101) {
-                    mod.info("Not running as Java version is at least Java 8u101.");
-                    return;
-                }
-                break;
+    private static boolean testJavaVersion() {
+        String version = System.getProperty("java.version");
+        // java 7 will not be used
+        if (!version.startsWith("1.8.0_")) {
+            return true;
+        }
+        return Integer.parseInt(version.substring(6)) >= 101;
+    }
+
+    private static void checkCertificateValidity() {
+        new Thread(() -> {
+            try {
+                URL url = new URL("https://helloworld.letsencrypt.org");
+                URLConnection conn = url.openConnection();
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+                conn.connect();
+
+                logger.info("Done - you are now able to access resources with a Let's Encrypt certificate :D");
+                LetsEncryptAdder.certificateLoaded = true;
+            } catch (IOException e) {
+                logger.error(UNKNOWN_ERROR_MSG, e);
+            }
+        }, "Lets Encrypt Certificate Verifier").start();
+    }
+
+    static void installLetsEncryptCertificates() {
+        if (testJavaVersion()) {
+            logger.info("Not running as Java version is at least Java 8u101.");
+            LetsEncryptAdder.certificateLoaded = true;
+            return;
         }
 
         try {
-            mod.info("Adding Let's Encrypt certificate...");
-            LetsEncryptAdder.addLetsEncryptCertificate();
-            mod.info("Done, attempting to connect to https://helloworld.letsencrypt.org...");
-            new Thread() {
-                @Override
-                public void run() {
-                    try {
-                        URL url = new URL("https://helloworld.letsencrypt.org");
-                        URLConnection conn = url.openConnection();
-                        conn.setConnectTimeout(5000);
-                        conn.setReadTimeout(5000);
-                        conn.connect();
-
-                        mod.info("Done - you are now able to access resources with a Let's Encrypt certificate :D");
-                    } catch (IOException e) {
-                        mod.error("An unknown error occurred whilst adding the Let's Encrypt root certificate. I'm afraid you may not be able to access resources with a Let's Encrypt certificate D:");
-                    }
-                }
-            }.start();
+            logger.info("Adding Let's Encrypt certificates");
+            LetsEncryptAdder.addLetsEncryptCertificates();
+            logger.info("Attempting to connect to https://helloworld.letsencrypt.org...");
+            LetsEncryptAdder.checkCertificateValidity();
         } catch (Exception e) {
-            mod.error("An error occurred whilst adding the Let's Encrypt root certificate. I'm afraid you wont be able to access resources with a Let's Encrypt certificate D:", e);
+            logger.error(UNKNOWN_ERROR_MSG, e);
         }
     }
 }

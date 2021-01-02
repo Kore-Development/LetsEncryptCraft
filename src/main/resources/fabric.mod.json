@@ -5,7 +5,8 @@
   "name": "Let's Encrypt Craft",
   "description": "Mojang uses old Java 8... so lets add it ourselves.",
   "authors": [
-    "Cloudhunter"
+    "Cloudhunter",
+    "killjoy1221"
   ],
   "contact": {
     "sources": "https://github.com/Cloudhunter/LetsEncryptCraft/"
